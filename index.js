@@ -2,7 +2,10 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const express = require("express")
 const jwt = require("jsonwebtoken")
 const app = express()
+// const Stripe = require('stripe');
+// const stripe = Stripe(`${process.env.STRIPE_SK}`);
 require("dotenv").config()
+const stripe = require("stripe")(process.env.STRIPE_SK)
 const cors = require("cors")
 const port = process.env.PORT || 5000;
 
@@ -176,21 +179,69 @@ app.post('/menu', verifyToken, verifyAdmin, async (req, res) => {
   res.send(result)
 })
 
-app.delete('/menu/:id',verifyToken, verifyAdmin, async (req, res) => {
+app.delete('/menu/:id', verifyToken, verifyAdmin, async (req, res) => {
   const id = req.params.id;
   const query = { _id: new ObjectId(id) }
   const result = await menuDB.deleteOne(query)
   res.send(result)
 })
 
-app.get('/menu/:id', async(req, res) =>{
+app.get('/menu/:id', async (req, res) => {
   const id = req.params.id;
-  const query = {_id: new ObjectId(id)}
-  console.log(id);
+  const query = { _id: new ObjectId(id) }
+  // console.log(id);
   const result = await menuDB.findOne(query)
   res.send(result)
 })
 
+app.patch('/menu/:id', async (req, res) => {
+  const id = req.params.id;
+  const item = req.body;
+  const filter = { _id: new ObjectId(id) }
+  const updatedDoc = {
+    $set: {
+      name: item.name,
+      price: item.price,
+      recipe: item.recipe,
+      image: item.image,
+      category: item.category
+    }
+  }
+
+  const result = await menuDB.updateOne(filter, updatedDoc)
+  res.send(result)
+
+})
+
+
+// stripe payment
+app.post("/create-payment-intent", async (req, res) => {
+  const { price } = req.body;
+  const amount = parseInt(price * 100);
+  // console.log({ amount });
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: amount,
+    currency: "usd",
+    payment_method_types: ['card']
+  });
+  res.send({
+    clientSecret: paymentIntent.client_secret,
+  });
+});
+// app.post('/create-payment-intent', verifyToken, async (req, res) => {
+//   const { price } = req.body;
+//   const amount = parseFloat(price) * 100;
+//   console.log("amount", amount);
+//   const paymentIntent = await stripe.paymentIntents.create({
+//     amount: amount,
+//     currency: 'usd',
+//     payment_method_types: ['card']
+//   })
+//   res.send({
+//     clientSecret: paymentIntent.client_secret,
+//   });
+
+// })
 
 app.listen(port, () => {
   console.log(`server is running at ${port}`);
